@@ -1,6 +1,6 @@
-Just put the target problem in the url section of code amd let this bad boy scrape everything from the problem page
+Just put the target problem in the url section of code and let this bad boy scrape everything from the problem page
 
-returns everything in a nice json
+Returns everything in a nice json
 
 Usage: 
 
