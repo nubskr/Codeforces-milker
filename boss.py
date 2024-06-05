@@ -2,16 +2,40 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import sys
+import stat
 
-url = 'https://codeforces.com/contest/1826/problem/A'
+url = sys.argv[1]
 
 response = requests.get(url)
 
-# setup the parser for html
 soup = BeautifulSoup(response.text, 'html.parser')
 
-# everything that matters is in this class
+if soup.text == "Just a moment...Enable JavaScript and cookies to continue":
+	print("Bypassing anti-scrap protection...")
+	scr = soup.findAll("script")[-1].string
+	scr = scr[scr.index("var a=toNumbers"):].split(';')
+	line = scr[0]
+	abc = []
+	while "toNumbers" in line:
+		i = line.index("toNumbers")
+		line = line[i+11:]
+		abc.append(line[:line.index('"')])
+	from Crypto.Cipher import AES
+	def to_numbers(x):
+		return bytes(int(x[i:i+2], 16) for i in range(0, len(x), 2))
+	key, iv, cipher = map(to_numbers, abc)
+	aes = AES.new(key, AES.MODE_CBC, iv)
+	rcpc = aes.decrypt(cipher).hex()
+	print(f"RCPC = {rcpc}")
+	url = scr[-2]
+	url = url[url.index('"')+1:-1]
+	r = requests.get(url, cookies={"RCPC": rcpc})
+	s = r.text
+	soup = BeautifulSoup(s, "html.parser")
+
 problem_statements = soup.find_all(class_='problem-statement')
+
+#print(problem_statements)
 
 for statement in problem_statements:
     # title
@@ -25,12 +49,20 @@ for statement in problem_statements:
     
     # input format
     input_spec = statement.find(class_='input-specification').text.strip().replace('Input', '')
-    print("Input Specification:", input_spec)
+    # print("Input Specification:", input_spec)
     
     # output format
     output_spec = statement.find(class_='output-specification').text.strip().replace('Output', '')
-    print("Output Specification:", output_spec)
+    # print("Output Specification:", output_spec)
     
+    problem = ""
+    for child in statement.children:
+        if child.name == 'div' and ('input-specification' in child.get('class', [])):
+            break
+
+        if child.name == 'div' and ('header' not in child.get('class', [])):
+            problem += child.text.strip()
+
     # sample inputs
     examples = statement.find(class_='sample-tests')
     input_tests = examples.find_all(class_='test-example-line')
@@ -47,7 +79,7 @@ for statement in problem_statements:
 
     # print(output_tests.text.strip())
     for i in output_tests:  
-        output_example_lines = i.text.strip()
+        output_example_lines = i.text.strip().replace('Output\n', '')
         outputs += output_example_lines
         outputs += '\n'
     
@@ -61,14 +93,15 @@ for statement in problem_statements:
     
     data = {
         "title": title,
-        "time limit": time_limit,
-        "memory limit": memory_limit,
-        "input format": input_spec,
-        "output format": output_spec,
-        "sample input": inputs,
-        "sample outputs": outputs,
-        "note": note_text
+        "time_limit": time_limit,
+        "memory_limit": memory_limit,
+        "input_format": input_spec,
+        "output_format": output_spec,
+        "statement": problem,
+        "sample_input": inputs,   
+        "sample_outputs": outputs,
+        "note": notes
     }
 
-    json_data = json.dumps(data, indent=4)
+    json_data = json.dumps(data, indent=0)
     print(json_data)
